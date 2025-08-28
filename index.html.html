@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic Calculator</title>
+  <style>
+    :root{
+      --bg:#0f1221;
+      --panel:#171b2e;
+      --accent:#7c9cff;
+      --text:#eaf0ff;
+      --muted:#9aa3c7;
+      --danger:#ff6b6b;
+      --ok:#46d39a;
+      --shadow:0 10px 25px rgba(0,0,0,.35);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; display:grid; place-items:center; min-height:100vh;
+      background: radial-gradient(1200px 800px at 20% 10%, #1a1f39 0%, #0f1221 60%, #0b0e1a 100%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+    }
+
+    .calculator{
+      width:min(92vw, 420px);
+      background:linear-gradient(180deg, #1a1f34, #121529);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow), inset 0 0 0 1px rgba(255,255,255,.04);
+      padding:18px;
+    }
+
+    .display{
+      background:linear-gradient(180deg, #0e1225, #0a0d1b);
+      border-radius:14px;
+      padding:16px 14px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+      min-height:84px;
+      display:flex; flex-direction:column; gap:6px; justify-content:center; align-items:flex-end;
+    }
+
+    .expression{ font-size: clamp(22px, 4.2vw, 28px); line-height:1.2; word-break:break-all; color:var(--text); }
+    .ghost{ font-size:14px; color:var(--muted); min-height:18px; }
+
+    .keys{
+      margin-top:14px;
+      display:grid; gap:10px;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    button.key{
+      border:none; border-radius:16px; padding:16px 0; font-size:20px; color:var(--text);
+      background:linear-gradient(180deg, #1b2040, #151935);
+      box-shadow: var(--shadow), inset 0 0 0 1px rgba(255,255,255,.05);
+      cursor:pointer; transition: transform .06s ease, box-shadow .2s ease, background .2s ease, filter .2s ease;
+      user-select:none;
+    }
+    button.key:hover{ filter:brightness(1.05); }
+    button.key:active{ transform: translateY(1px) scale(.98); }
+    button.key.op{ color:var(--accent); }
+    button.key.equal{ background: linear-gradient(180deg, #4a68ff, #3755ee); color:white; }
+    button.key.clear{ background: linear-gradient(180deg, #3a1e2a, #2a1420); color: var(--danger); }
+    button.key.util{ color: var(--muted); }
+
+    .footer{
+      margin-top:10px; text-align:center; color:var(--muted); font-size:12px;
+    }
+    kbd{background:#202542; border-radius:6px; padding:2px 6px; font-size:11px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);}  
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Basic Calculator">
+    <section class="display" aria-live="polite">
+      <div id="ghost" class="ghost">Typing… live result appears here</div>
+      <div id="expr" class="expression" title="Expression">0</div>
+    </section>
+
+    <section class="keys" role="group" aria-label="Calculator keys">
+      <!-- Row 1 -->
+      <button class="key clear" data-action="clear" aria-label="Clear"><strong>C</strong></button>
+      <button class="key util" data-action="back" aria-label="Backspace">⌫</button>
+      <button class="key util" data-value="(" aria-label="Left parenthesis">(</button>
+      <button class="key op" data-value="÷" aria-label="Divide">÷</button>
+
+      <!-- Row 2 -->
+      <button class="key" data-value="7">7</button>
+      <button class="key" data-value="8">8</button>
+      <button class="key" data-value="9">9</button>
+      <button class="key op" data-value="×" aria-label="Multiply">×</button>
+
+      <!-- Row 3 -->
+      <button class="key" data-value="4">4</button>
+      <button class="key" data-value="5">5</button>
+      <button class="key" data-value="6">6</button>
+      <button class="key op" data-value="-" aria-label="Subtract">−</button>
+
+      <!-- Row 4 -->
+      <button class="key" data-value="1">1</button>
+      <button class="key" data-value="2">2</button>
+      <button class="key" data-value="3">3</button>
+      <button class="key op" data-value="+" aria-label="Add">+</button>
+
+      <!-- Row 5 -->
+      <button class="key util" data-value=")" aria-label="Right parenthesis">)</button>
+      <button class="key" data-value="0">0</button>
+      <button class="key" data-value=".">.</button>
+      <button class="key equal" data-action="equals" aria-label="Equals">=</button>
+    </section>
+
+    <p class="footer">Keyboard: <kbd>0-9</kbd> <kbd>+ − × ÷</kbd> or <kbd>/*-+</kbd>, <kbd>.</kbd>, <kbd>( )</kbd>, <kbd>Enter</kbd>=equals, <kbd>Backspace</kbd>=delete, <kbd>Esc</kbd>=clear</p>
+  </main>
+
+  <script>
+    (function(){
+      const exprEl = document.getElementById('expr');
+      const ghostEl = document.getElementById('ghost');
+      let expr = '';
+
+      // Helper: sanitize and evaluate safely (digits, ops, dot, spaces, parentheses)
+      function safeEval(displayExpr){
+        try{
+          const jsExpr = displayExpr
+            .replace(/×/g,'*')
+            .replace(/÷/g,'/')
+            .replace(/−/g,'-');
+
+          // allow only safe characters
+          if(!/^[0-9+\-*/().\s]*$/.test(jsExpr)) return null;
+          // basic check: expression shouldn't end with an operator (except closing paren)
+          if(/[+\-*/.]$/.test(jsExpr)) return null;
+          // avoid dangerous sequences (though not possible due to regex above)
+
+          // Use Function instead of eval, since we control allowed chars
+          const result = Function('return (' + jsExpr + ')')();
+          if (typeof result === 'number' && Number.isFinite(result)) return result;
+          return null;
+        }catch(e){
+          return null;
+        }
+      }
+
+      function updateDisplay(){
+        exprEl.textContent = expr.length ? expr : '0';
+        const preview = safeEval(expr);
+        if(preview === null){
+          ghostEl.textContent = expr ? '…' : 'Typing… live result appears here';
+          ghostEl.style.color = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+        } else {
+          ghostEl.textContent = '= ' + preview;
+          ghostEl.style.color = getComputedStyle(document.documentElement).getPropertyValue('--ok');
+        }
+      }
+
+      function append(value){
+        // Prevent two operators in a row (except minus for negative numbers and parentheses handling)
+        const last = expr.slice(-1);
+        const isOp = v => ['+','-','×','÷','*','/'].includes(v);
+
+        if (value === '.'){
+          // Avoid multiple dots in the current number
+          // Find the last number segment
+          const match = expr.match(/([0-9]*\.?[0-9]*)$/);
+          if(match && match[0].includes('.')) return; // already has a dot
+        }
+
+        if(isOp(value)){
+          if(expr === '' && value !== '-') return; // allow leading minus only
+          if(isOp(last)){
+            // Replace last operator (except allow "-" after ( or at start for negatives)
+            if(!(value === '-' && (last === '(' || expr.length === 0))){
+              expr = expr.slice(0,-1) + value;
+              updateDisplay();
+              return;
+            }
+          }
+        }
+
+        // Smart insert: if starting with ")" or operator after "("
+        if (value === ')' ){
+          // only allow if there is an unmatched "("
+          const opens = (expr.match(/\(/g)||[]).length;
+          const closes = (expr.match(/\)/g)||[]).length;
+          if (opens <= closes) return; // ignore extra closing
+        }
+
+        if (value === '('){
+          // Automatically insert multiplication in cases like 2(3) or )( -> )*(
+          if(expr && /[0-9)\.]$/.test(expr)) expr += '×';
+        }
+
+        expr += value;
+        updateDisplay();
+      }
+
+      function back(){ expr = expr.slice(0,-1); updateDisplay(); }
+      function clearAll(){ expr=''; updateDisplay(); }
+      function equals(){
+        const result = safeEval(expr);
+        if(result !== null){ expr = String(result); updateDisplay(); }
+      }
+
+      document.querySelectorAll('button.key').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          const val = btn.dataset.value;
+          if(action === 'clear') return clearAll();
+          if(action === 'back') return back();
+          if(action === 'equals') return equals();
+          if(val!=null) return append(val);
+        });
+      });
+
+      // Keyboard support
+      const keyMap = {
+        '*':'×', '/':'÷', '+':'+', '-':'-', '.':'.', '(': '(', ')': ')'
+      };
+
+      window.addEventListener('keydown', (e) => {
+        const { key } = e;
+        if (/^[0-9]$/.test(key)) { append(key); return; }
+        if (key in keyMap) { append(keyMap[key]); e.preventDefault(); return; }
+        if (key === 'Enter' || key === '=') { e.preventDefault(); equals(); return; }
+        if (key === 'Backspace') { back(); return; }
+        if (key === 'Escape' || key === 'Delete') { clearAll(); return; }
+      });
+
+      updateDisplay();
+    })();
+  </script>
+</body>
+</html>
